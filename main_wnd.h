@@ -88,7 +88,7 @@ class QtMainWnd : public QWidget, public MainWindow {
   virtual void closeEvent(QCloseEvent* event);
 
  protected:
-  class VideoRenderer : public webrtc::VideoRendererInterface {
+  class VideoRenderer : public rtc::VideoSinkInterface<webrtc::VideoFrame> {
    public:
     VideoRenderer(QtMainWnd* main_wnd,
                   webrtc::VideoTrackInterface* track_to_render);
@@ -96,7 +96,7 @@ class QtMainWnd : public QWidget, public MainWindow {
 
     // VideoRendererInterface implementation
     virtual void SetSize(int width, int height);
-    virtual void RenderFrame(const cricket::VideoFrame* frame);
+    virtual void OnFrame(const webrtc::VideoFrame& frame);
 
     const uint8* image() const {
       return image_.get();
@@ -111,11 +111,11 @@ class QtMainWnd : public QWidget, public MainWindow {
     }
 
    protected:
-    talk_base::scoped_ptr<uint8[]> image_;
+    std::unique_ptr<uint8[]> image_;
     int width_;
     int height_;
     QtMainWnd* main_wnd_;
-    talk_base::scoped_refptr<webrtc::VideoTrackInterface> rendered_track_;
+    rtc::scoped_refptr<webrtc::VideoTrackInterface> rendered_track_;
   };
 
  protected:
@@ -132,8 +132,8 @@ class QtMainWnd : public QWidget, public MainWindow {
   std::string port_;
   bool autoconnect_;
   bool autocall_;
-  talk_base::scoped_ptr<VideoRenderer> local_renderer_;
-  talk_base::scoped_ptr<VideoRenderer> remote_renderer_;
+  std::unique_ptr<VideoRenderer> local_renderer_;
+  std::unique_ptr<VideoRenderer> remote_renderer_;
 };
 
 #endif  // PEERCONNECTION_SAMPLES_CLIENT_LINUX_MAIN_WND_H_

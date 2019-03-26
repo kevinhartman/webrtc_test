@@ -42,11 +42,11 @@
 #include <stddef.h>
 
 #include "backend/defaults.h"
-#include "talk/base/common.h"
-#include "talk/base/logging.h"
-#include "talk/base/stringutils.h"
-
-using talk_base::sprintfn;
+//#include "talk/base/common.h"
+#include "api/video/i420_buffer.h"
+#include "rtc_base/logging.h"
+#include "rtc_base/string_utils.h"
+#include "third_party/libyuv/include/libyuv/convert_argb.h"
 
 void QtMainWnd::HandleUIThreadCallback(int msg_id, void* data)
 {
@@ -61,7 +61,7 @@ QtMainWnd::QtMainWnd(const char* server, int port, bool autoconnect,
     : server_(server), autoconnect_(autoconnect), autocall_(autocall), state_(CONNECT_TO_SERVER), closing_(false)
 {
   char buffer[10];
-  sprintfn(buffer, sizeof(buffer), "%i", port);
+  snprintf(buffer, sizeof(buffer), "%i", port);
   port_ = buffer;
 }
 
@@ -217,11 +217,11 @@ QtMainWnd::VideoRenderer::VideoRenderer(
       height_(0),
       main_wnd_(main_wnd),
       rendered_track_(track_to_render) {
-  rendered_track_->AddRenderer(this);
+  rendered_track_->AddOrUpdateSink(this, rtc::VideoSinkWants());
 }
 
 QtMainWnd::VideoRenderer::~VideoRenderer() {
-  rendered_track_->RemoveRenderer(this);
+  rendered_track_->RemoveSink(this);
 }
 
 void QtMainWnd::VideoRenderer::SetSize(int width, int height) {
@@ -233,24 +233,24 @@ void QtMainWnd::VideoRenderer::SetSize(int width, int height) {
   image_.reset(new uint8[width * height * 4]);
 }
 
-void QtMainWnd::VideoRenderer::RenderFrame(const cricket::VideoFrame* frame) {
+void QtMainWnd::VideoRenderer::OnFrame(const webrtc::VideoFrame& frame) {
   int size = width_ * height_ * 4;
   // TODO: Convert directly to RGBA
-  frame->ConvertToRgbBuffer(cricket::FOURCC_ARGB,
-                            image_.get(),
-                            size,
-                            width_ * 4);
-  // Convert the B,G,R,A frame to R,G,B,A, which is accepted by GTK.
-  // The 'A' is just padding for GTK, so we can use it as temp.
-/*  uint8* pix = image_.get();
-  uint8* end = image_.get() + size;
-  while (pix < end) {
-    pix[3] = pix[0];     // Save B to A.
-    pix[0] = pix[2];  // Set Red.
-    pix[2] = pix[3];  // Set Blue.
-    pix[3] = 0xFF;     // Fixed Alpha.
-    pix += 4;
-  }*/
+
+  rtc::scoped_refptr<webrtc::I420BufferInterface> buffer(
+      frame.video_frame_buffer()->ToI420());
+  if (frame.rotation() != webrtc::kVideoRotation_0) {
+    buffer = webrtc::I420Buffer::Rotate(*buffer.get(), frame.rotation());
+  }
+
+  SetSize(buffer->width(), buffer->height());
+
+  RTC_DCHECK(image_.get() != NULL);
+  libyuv::I420ToARGB(buffer->DataY(), buffer->StrideY(), buffer->DataU(),
+      buffer->StrideU(), buffer->DataV(), buffer->StrideV(),
+      image_.get(),
+      width_ * 4,
+      buffer->width(), buffer->height());
 
   QMetaObject::invokeMethod(main_wnd_, "repaint", Qt::QueuedConnection);
 }

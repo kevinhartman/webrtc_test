@@ -1,44 +1,26 @@
 /*
- * libjingle
- * Copyright 2012, Google Inc.
+ *  Copyright 2012 The WebRTC Project Authors. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *  1. Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright notice,
- *     this list of conditions and the following disclaimer in the documentation
- *     and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
- * EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef PEERCONNECTION_SAMPLES_CLIENT_CONDUCTOR_H_
-#define PEERCONNECTION_SAMPLES_CLIENT_CONDUCTOR_H_
-#pragma once
+#ifndef EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
+#define EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_
 
 #include <deque>
 #include <map>
-#include <set>
+#include <memory>
 #include <string>
+#include <vector>
 
-#include "main_wnd.h"
-#include "peer_connection_client.h"
-#include "talk/app/webrtc/mediastreaminterface.h"
-#include "talk/app/webrtc/peerconnectioninterface.h"
-#include "talk/base/scoped_ptr.h"
+#include "api/media_stream_interface.h"
+#include "api/peer_connection_interface.h"
+#include "examples/peerconnection/client/main_wnd.h"
+#include "examples/peerconnection/client/peer_connection_client.h"
 
 namespace webrtc {
 class VideoCaptureModule;
@@ -48,97 +30,105 @@ namespace cricket {
 class VideoRenderer;
 }  // namespace cricket
 
-class Conductor
-  : public webrtc::PeerConnectionObserver,
-    public webrtc::CreateSessionDescriptionObserver,
-    public PeerConnectionClientObserver,
-    public MainWndCallback {
+class Conductor : public webrtc::PeerConnectionObserver,
+                  public webrtc::CreateSessionDescriptionObserver,
+                  public PeerConnectionClientObserver,
+                  public MainWndCallback {
  public:
   enum CallbackID {
     MEDIA_CHANNELS_INITIALIZED = 1,
     PEER_CONNECTION_CLOSED,
     SEND_MESSAGE_TO_PEER,
-    PEER_CONNECTION_ERROR,
-    NEW_STREAM_ADDED,
-    STREAM_REMOVED,
+    NEW_TRACK_ADDED,
+    TRACK_REMOVED,
   };
 
   Conductor(PeerConnectionClient* client, MainWindow* main_wnd);
 
   bool connection_active() const;
 
-  virtual void Close();
+  void Close() override;
 
  protected:
   ~Conductor();
   bool InitializePeerConnection();
+  bool ReinitializePeerConnectionForLoopback();
+  bool CreatePeerConnection(bool dtls);
   void DeletePeerConnection();
   void EnsureStreamingUI();
-  void AddStreams();
-  cricket::VideoCapturer* OpenVideoCaptureDevice();
+  void AddTracks();
 
   //
   // PeerConnectionObserver implementation.
   //
-  virtual void OnError();
-  virtual void OnStateChange(
-      webrtc::PeerConnectionObserver::StateType state_changed) {}
-  virtual void OnAddStream(webrtc::MediaStreamInterface* stream);
-  virtual void OnRemoveStream(webrtc::MediaStreamInterface* stream);
-  virtual void OnRenegotiationNeeded() {}
-  virtual void OnIceChange() {}
-  virtual void OnIceCandidate(const webrtc::IceCandidateInterface* candidate);
+
+  void OnSignalingChange(
+      webrtc::PeerConnectionInterface::SignalingState new_state) override {}
+  void OnAddTrack(
+      rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver,
+      const std::vector<rtc::scoped_refptr<webrtc::MediaStreamInterface>>&
+          streams) override;
+  void OnRemoveTrack(
+      rtc::scoped_refptr<webrtc::RtpReceiverInterface> receiver) override;
+  void OnDataChannel(
+      rtc::scoped_refptr<webrtc::DataChannelInterface> channel) override {}
+  void OnRenegotiationNeeded() override {}
+  void OnIceConnectionChange(
+      webrtc::PeerConnectionInterface::IceConnectionState new_state) override {}
+  void OnIceGatheringChange(
+      webrtc::PeerConnectionInterface::IceGatheringState new_state) override {}
+  void OnIceCandidate(const webrtc::IceCandidateInterface* candidate) override;
+  void OnIceConnectionReceivingChange(bool receiving) override {}
 
   //
   // PeerConnectionClientObserver implementation.
   //
 
-  virtual void OnSignedIn();
+  void OnSignedIn() override;
 
-  virtual void OnDisconnected();
+  void OnDisconnected() override;
 
-  virtual void OnPeerConnected(int id, const std::string& name);
+  void OnPeerConnected(int id, const std::string& name) override;
 
-  virtual void OnPeerDisconnected(int id);
+  void OnPeerDisconnected(int id) override;
 
-  virtual void OnMessageFromPeer(int peer_id, const std::string& message);
+  void OnMessageFromPeer(int peer_id, const std::string& message) override;
 
-  virtual void OnMessageSent(int err);
+  void OnMessageSent(int err) override;
 
-  virtual void OnServerConnectionFailure();
+  void OnServerConnectionFailure() override;
 
   //
   // MainWndCallback implementation.
   //
 
-  virtual void StartLogin(const std::string& server, int port);
+  void StartLogin(const std::string& server, int port) override;
 
-  virtual void DisconnectFromServer();
+  void DisconnectFromServer() override;
 
-  virtual void ConnectToPeer(int peer_id);
+  void ConnectToPeer(int peer_id) override;
 
-  virtual void DisconnectFromCurrentPeer();
+  void DisconnectFromCurrentPeer() override;
 
-  virtual void UIThreadCallback(int msg_id, void* data);
+  void UIThreadCallback(int msg_id, void* data) override;
 
   // CreateSessionDescriptionObserver implementation.
-  virtual void OnSuccess(webrtc::SessionDescriptionInterface* desc);
-  virtual void OnFailure(const std::string& error);
+  void OnSuccess(webrtc::SessionDescriptionInterface* desc) override;
+  void OnFailure(webrtc::RTCError error) override;
 
  protected:
   // Send a message to the remote peer.
   void SendMessage(const std::string& json_object);
 
   int peer_id_;
-  talk_base::scoped_refptr<webrtc::PeerConnectionInterface> peer_connection_;
-  talk_base::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
+  bool loopback_;
+  rtc::scoped_refptr<webrtc::PeerConnectionInterface> peer_connection_;
+  rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
       peer_connection_factory_;
   PeerConnectionClient* client_;
   MainWindow* main_wnd_;
   std::deque<std::string*> pending_messages_;
-  std::map<std::string, talk_base::scoped_refptr<webrtc::MediaStreamInterface> >
-      active_streams_;
   std::string server_;
 };
 
-#endif  // PEERCONNECTION_SAMPLES_CLIENT_CONDUCTOR_H_
+#endif  // EXAMPLES_PEERCONNECTION_CLIENT_CONDUCTOR_H_

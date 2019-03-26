@@ -1,42 +1,24 @@
 /*
- * libjingle
- * Copyright 2011, Google Inc.
+ *  Copyright 2011 The WebRTC Project Authors. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *  1. Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright notice,
- *     this list of conditions and the following disclaimer in the documentation
- *     and/or other materials provided with the distribution.
- *  3. The name of the author may not be used to endorse or promote products
- *     derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
- * EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *  Use of this source code is governed by a BSD-style license
+ *  that can be found in the LICENSE file in the root of the source
+ *  tree. An additional intellectual property rights grant can be found
+ *  in the file PATENTS.  All contributing project authors may
+ *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef PEERCONNECTION_SAMPLES_CLIENT_PEER_CONNECTION_CLIENT_H_
-#define PEERCONNECTION_SAMPLES_CLIENT_PEER_CONNECTION_CLIENT_H_
-#pragma once
+#ifndef EXAMPLES_PEERCONNECTION_CLIENT_PEER_CONNECTION_CLIENT_H_
+#define EXAMPLES_PEERCONNECTION_CLIENT_PEER_CONNECTION_CLIENT_H_
 
 #include <map>
+#include <memory>
 #include <string>
 
-#include "talk/base/nethelpers.h"
-#include "talk/base/signalthread.h"
-#include "talk/base/sigslot.h"
-#include "talk/base/physicalsocketserver.h"
-#include "talk/base/scoped_ptr.h"
+#include "rtc_base/net_helpers.h"
+#include "rtc_base/physical_socket_server.h"
+#include "rtc_base/signal_thread.h"
+#include "rtc_base/third_party/sigslot/sigslot.h"
 
 typedef std::map<int, std::string> Peers;
 
@@ -54,7 +36,7 @@ struct PeerConnectionClientObserver {
 };
 
 class PeerConnectionClient : public sigslot::has_slots<>,
-                             public talk_base::MessageHandler {
+                             public rtc::MessageHandler {
  public:
   enum State {
     NOT_CONNECTED,
@@ -74,7 +56,8 @@ class PeerConnectionClient : public sigslot::has_slots<>,
 
   void RegisterObserver(PeerConnectionClientObserver* callback);
 
-  void Connect(const std::string& server, int port,
+  void Connect(const std::string& server,
+               int port,
                const std::string& client_name);
 
   bool SendToPeer(int peer_id, const std::string& message);
@@ -84,50 +67,59 @@ class PeerConnectionClient : public sigslot::has_slots<>,
   bool SignOut();
 
   // implements the MessageHandler interface
-  void OnMessage(talk_base::Message* msg);
+  void OnMessage(rtc::Message* msg);
 
  protected:
   void DoConnect();
   void Close();
   void InitSocketSignals();
   bool ConnectControlSocket();
-  void OnConnect(talk_base::AsyncSocket* socket);
-  void OnHangingGetConnect(talk_base::AsyncSocket* socket);
+  void OnConnect(rtc::AsyncSocket* socket);
+  void OnHangingGetConnect(rtc::AsyncSocket* socket);
   void OnMessageFromPeer(int peer_id, const std::string& message);
 
   // Quick and dirty support for parsing HTTP header values.
-  bool GetHeaderValue(const std::string& data, size_t eoh,
-                      const char* header_pattern, size_t* value);
+  bool GetHeaderValue(const std::string& data,
+                      size_t eoh,
+                      const char* header_pattern,
+                      size_t* value);
 
-  bool GetHeaderValue(const std::string& data, size_t eoh,
-                      const char* header_pattern, std::string* value);
+  bool GetHeaderValue(const std::string& data,
+                      size_t eoh,
+                      const char* header_pattern,
+                      std::string* value);
 
   // Returns true if the whole response has been read.
-  bool ReadIntoBuffer(talk_base::AsyncSocket* socket, std::string* data,
+  bool ReadIntoBuffer(rtc::AsyncSocket* socket,
+                      std::string* data,
                       size_t* content_length);
 
-  void OnRead(talk_base::AsyncSocket* socket);
+  void OnRead(rtc::AsyncSocket* socket);
 
-  void OnHangingGetRead(talk_base::AsyncSocket* socket);
+  void OnHangingGetRead(rtc::AsyncSocket* socket);
 
   // Parses a single line entry in the form "<name>,<id>,<connected>"
-  bool ParseEntry(const std::string& entry, std::string* name, int* id,
+  bool ParseEntry(const std::string& entry,
+                  std::string* name,
+                  int* id,
                   bool* connected);
 
   int GetResponseStatus(const std::string& response);
 
-  bool ParseServerResponse(const std::string& response, size_t content_length,
-                           size_t* peer_id, size_t* eoh);
+  bool ParseServerResponse(const std::string& response,
+                           size_t content_length,
+                           size_t* peer_id,
+                           size_t* eoh);
 
-  void OnClose(talk_base::AsyncSocket* socket, int err);
+  void OnClose(rtc::AsyncSocket* socket, int err);
 
-  void OnResolveResult(talk_base::AsyncResolverInterface* resolver);
+  void OnResolveResult(rtc::AsyncResolverInterface* resolver);
 
   PeerConnectionClientObserver* callback_;
-  talk_base::SocketAddress server_address_;
-  talk_base::AsyncResolver* resolver_;
-  talk_base::scoped_ptr<talk_base::AsyncSocket> control_socket_;
-  talk_base::scoped_ptr<talk_base::AsyncSocket> hanging_get_;
+  rtc::SocketAddress server_address_;
+  rtc::AsyncResolver* resolver_;
+  std::unique_ptr<rtc::AsyncSocket> control_socket_;
+  std::unique_ptr<rtc::AsyncSocket> hanging_get_;
   std::string onconnect_data_;
   std::string control_data_;
   std::string notification_data_;
@@ -137,4 +129,4 @@ class PeerConnectionClient : public sigslot::has_slots<>,
   int my_id_;
 };
 
-#endif  // PEERCONNECTION_SAMPLES_CLIENT_PEER_CONNECTION_CLIENT_H_
+#endif  // EXAMPLES_PEERCONNECTION_CLIENT_PEER_CONNECTION_CLIENT_H_

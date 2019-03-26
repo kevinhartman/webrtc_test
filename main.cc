@@ -26,12 +26,12 @@
  */
 
 #include "backend/conductor.h"
-#include "backend/flagdefs.h"
+#include "backend/flag_defs.h"
 #include "main_wnd.h"
 #include "backend/peer_connection_client.h"
 
-#include "talk/base/ssladapter.h"
-#include "talk/base/thread.h"
+#include "rtc_base/ssl_adapter.h"
+#include "rtc_base/thread.h"
 
 #include <QtWidgets/QApplication>
 
@@ -45,9 +45,9 @@ namespace
   static QApplication* app;
 };
 
-class CustomSocketServer : public talk_base::PhysicalSocketServer {
+class CustomSocketServer : public rtc::PhysicalSocketServer {
  public:
-  CustomSocketServer(talk_base::Thread* thread, QtMainWnd* wnd)
+  CustomSocketServer(rtc::Thread* thread, QtMainWnd* wnd)
       : thread_(thread), wnd_(wnd), conductor_(NULL), client_(NULL) {}
   virtual ~CustomSocketServer() {}
 
@@ -68,12 +68,12 @@ class CustomSocketServer : public talk_base::PhysicalSocketServer {
         client_ != NULL && !client_->is_connected()) {
       thread_->Quit();
     }
-    return talk_base::PhysicalSocketServer::Wait(0/*cms == -1 ? 1 : cms*/,
+    return rtc::PhysicalSocketServer::Wait(0/*cms == -1 ? 1 : cms*/,
                                                  process_io);
   }
 
  protected:
-  talk_base::Thread* thread_;
+  rtc::Thread* thread_;
   QtMainWnd* wnd_;
   Conductor* conductor_;
   PeerConnectionClient* client_;
@@ -88,9 +88,9 @@ int main(int argc, char* argv[]) {
 #endif
   app = new QApplication(argc, argv);
 
-  FlagList::SetFlagsFromCommandLine(&argc, argv, true);
+  rtc::FlagList::SetFlagsFromCommandLine(&argc, argv, true);
   if (FLAG_help) {
-    FlagList::Print(NULL, false);
+    rtc::FlagList::Print(NULL, false);
     return 0;
   }
 
@@ -104,16 +104,15 @@ int main(int argc, char* argv[]) {
   QtMainWnd wnd(FLAG_server, FLAG_port, FLAG_autoconnect, FLAG_autocall);
   wnd.Create();
 
-  talk_base::AutoThread auto_thread;
-  talk_base::Thread* thread = talk_base::Thread::Current();
+  rtc::Thread* thread = rtc::Thread::Current();
   CustomSocketServer socket_server(thread, &wnd);
-  thread->set_socketserver(&socket_server);
+  rtc::AutoSocketServerThread auto_thread(&socket_server);
 
-  talk_base::InitializeSSL();
+  rtc::InitializeSSL();
   // Must be constructed after we set the socketserver.
   PeerConnectionClient client;
-  talk_base::scoped_refptr<Conductor> conductor(
-      new talk_base::RefCountedObject<Conductor>(&client, &wnd));
+  rtc::scoped_refptr<Conductor> conductor(
+      new rtc::RefCountedObject<Conductor>(&client, &wnd));
   socket_server.set_client(&client);
   socket_server.set_conductor(conductor);
 
@@ -122,12 +121,11 @@ int main(int argc, char* argv[]) {
   // gtk_main();
   wnd.Destroy();
 
-  thread->set_socketserver(NULL);
   // TODO: Run the Gtk main loop to tear down the connection.
   //while (gtk_events_pending()) {
   //  gtk_main_iteration();
   //}
-  talk_base::CleanupSSL();
+  rtc::CleanupSSL();
   return 0;
 }
 
